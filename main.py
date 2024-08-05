@@ -1,8 +1,8 @@
 import json
+import logging
 import os
 import subprocess
 import time
-import logging
 from typing import Dict, Any
 
 import numpy as np
@@ -16,17 +16,21 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Constants
 DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
 
+
 def load_config() -> Dict[str, Any]:
     with open('config.json', 'r') as config_file:
         return json.load(config_file)
 
+
 CONFIG = load_config()
+
 
 def load_model_and_processor(model_name: str):
     processor = WhisperProcessor.from_pretrained(model_name)
     model = WhisperForConditionalGeneration.from_pretrained(model_name)
     model = model.to(DEVICE)
     return processor, model
+
 
 # Load model and processor
 model_name = CONFIG["model_name"]
@@ -49,6 +53,7 @@ def process_audio(audio_chunk: torch.Tensor) -> str:
 
     transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
     return transcription
+
 
 def audio_callback(indata: np.ndarray, frames: int, time, status: sd.CallbackFlags) -> None:
     if status:
@@ -91,6 +96,7 @@ def summarize_with_ollama(file_path: str) -> str:
         logging.error(f"Ollama stderr: {e.stderr}")
         return None
 
+
 def cleanup_files():
     try:
         os.remove(CONFIG["live_translation_file"])
@@ -100,10 +106,11 @@ def cleanup_files():
     except Exception as e:
         logging.error(f"Error cleaning up file: {e}")
 
+
 def main():
     stream = sd.InputStream(callback=audio_callback, channels=1, samplerate=sample_rate,
-                        blocksize=int(sample_rate * chunk_duration))
-    
+                            blocksize=int(sample_rate * chunk_duration))
+
     with stream:
         logging.info("Listening... Press Ctrl+C to stop.")
         try:
@@ -127,6 +134,7 @@ def main():
         logging.error("Failed to generate summary.")
 
     cleanup_files()
+
 
 if __name__ == "__main__":
     main()
