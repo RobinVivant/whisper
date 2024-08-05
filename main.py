@@ -1,10 +1,10 @@
 import json
 import logging
 import os
+import signal
 import subprocess
 import sys
 import time
-import signal
 from typing import Dict, Any, List
 
 import numpy as np
@@ -13,7 +13,7 @@ import torch
 from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq
 
 # Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Constants
 if torch.backends.mps.is_available():
@@ -30,12 +30,13 @@ def load_config() -> Dict[str, Any]:
     try:
         with open('config.json', 'r') as config_file:
             config = json.load(config_file)
-        
-        required_keys = ["model_name", "sample_rate", "chunk_duration", "ollama_model", "live_translation_file", "summary_output_file"]
+
+        required_keys = ["model_name", "sample_rate", "chunk_duration", "ollama_model", "live_translation_file",
+                         "summary_output_file"]
         for key in required_keys:
             if key not in config:
                 raise KeyError(f"Missing required key in config: {key}")
-        
+
         return config
     except FileNotFoundError:
         logging.error("config.json file not found.")
@@ -46,6 +47,7 @@ def load_config() -> Dict[str, Any]:
     except KeyError as e:
         logging.error(str(e))
         raise
+
 
 try:
     CONFIG = load_config()
@@ -222,7 +224,7 @@ def main():
     if os.path.exists(CONFIG["live_translation_file"]) and os.path.getsize(CONFIG["live_translation_file"]) > 0:
         print("Transcriptions found.")
         summarize = input("Do you want to generate a summary? (y/n): ").lower().strip() == 'y'
-        
+
         if summarize:
             print("Generating summary...")
             summary = summarize_with_ollama(CONFIG["live_translation_file"])
