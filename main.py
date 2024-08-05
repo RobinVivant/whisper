@@ -97,7 +97,7 @@ def audio_callback(indata: np.ndarray, frames: int, time, status: sd.CallbackFla
         if transcription:
             with open(CONFIG["live_translation_file"], "a") as f:
                 f.write(transcription + "\n")
-            logging.info(f"Transcribed: {transcription}")
+            print(f"Transcribed: {transcription}")  # Display on console
         else:
             logging.warning("No transcription generated for this audio chunk.")
     except Exception as e:
@@ -185,7 +185,7 @@ def main():
         recording = False
 
     with stream:
-        logging.info("Listening... Press Ctrl+C to stop.")
+        print("Listening... Press Ctrl+C to stop.")
         try:
             while recording:
                 time.sleep(0.1)
@@ -193,27 +193,28 @@ def main():
             stop_recording()
         finally:
             stream.stop()
-            logging.info("Stopped listening. Generating summary...")
+            print("Stopped listening.")
 
-    logging.info("Checking if any transcriptions were generated...")
     if os.path.exists(CONFIG["live_translation_file"]) and os.path.getsize(CONFIG["live_translation_file"]) > 0:
-        logging.info("Transcriptions found. Proceeding with summary generation.")
+        print("Transcriptions found.")
+        summarize = input("Do you want to generate a summary? (y/n): ").lower().strip() == 'y'
+        
+        if summarize:
+            print("Generating summary...")
+            summary = summarize_with_ollama(CONFIG["live_translation_file"])
+
+            if summary:
+                print("\nSummary of the meeting:")
+                print(summary)
+
+                # Save the summary to a file
+                with open(CONFIG["summary_output_file"], "w") as f:
+                    f.write(summary)
+                print(f"Summary saved to '{CONFIG['summary_output_file']}'")
+            else:
+                print("Failed to generate summary.")
     else:
-        logging.warning("No transcriptions were generated. The audio input might not have been captured correctly.")
-
-    # Generate summary after recording stops
-    summary = summarize_with_ollama(CONFIG["live_translation_file"])
-
-    if summary:
-        logging.info("\nSummary of the meeting:")
-        logging.info(summary)
-
-        # Save the summary to a file
-        with open(CONFIG["summary_output_file"], "w") as f:
-            f.write(summary)
-        logging.info(f"Summary saved to '{CONFIG['summary_output_file']}'")
-    else:
-        logging.error("Failed to generate summary.")
+        print("No transcriptions were generated. The audio input might not have been captured correctly.")
 
     cleanup_files()
 
