@@ -55,7 +55,7 @@ def process_audio(audio_chunk: torch.Tensor) -> str:
     return transcription
 
 
-def audio_callback(indata: np.ndarray, frames: int, time: sd.CallbackTime, status: sd.CallbackFlags) -> None:
+def audio_callback(indata: np.ndarray, frames: int, time, status: sd.CallbackFlags) -> None:
     if status:
         logging.error(f"Error in audio stream: {status}")
         return
