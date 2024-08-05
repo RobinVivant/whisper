@@ -3,6 +3,7 @@ import logging
 import os
 import subprocess
 import time
+import signal
 from typing import Dict, Any, List
 
 import numpy as np
@@ -25,11 +26,31 @@ logging.info(f"Using device: {DEVICE}")
 
 
 def load_config() -> Dict[str, Any]:
-    with open('config.json', 'r') as config_file:
-        return json.load(config_file)
+    try:
+        with open('config.json', 'r') as config_file:
+            config = json.load(config_file)
+        
+        required_keys = ["model_name", "sample_rate", "chunk_duration", "ollama_model", "live_translation_file", "summary_output_file"]
+        for key in required_keys:
+            if key not in config:
+                raise KeyError(f"Missing required key in config: {key}")
+        
+        return config
+    except FileNotFoundError:
+        logging.error("config.json file not found.")
+        raise
+    except json.JSONDecodeError:
+        logging.error("Error parsing config.json. Please check the file format.")
+        raise
+    except KeyError as e:
+        logging.error(str(e))
+        raise
 
-
-CONFIG = load_config()
+try:
+    CONFIG = load_config()
+except Exception as e:
+    logging.error(f"Failed to load configuration: {e}")
+    sys.exit(1)
 
 
 def load_model_and_processor(model_name_param: str):
@@ -91,6 +112,9 @@ def audio_callback(indata: np.ndarray, frames: int, time, status: sd.CallbackFla
 
     try:
         logging.debug(f"Received audio chunk of shape: {indata.shape}")
+        if indata.size == 0:
+            logging.warning("Received empty audio chunk")
+            return
         audio_chunk = torch.from_numpy(indata[:, 0]).float()
         transcription = process_audio(audio_chunk)
 
@@ -123,11 +147,11 @@ def summarize_with_ollama(file_path: str) -> str:
         except json.JSONDecodeError as je:
             logging.error(f"Error parsing Ollama output: {je}")
             logging.error(f"Raw output: {result.stdout}")
-            return ""
+            return result.stdout  # Return raw output if JSON parsing fails
     except subprocess.CalledProcessError as e:
         logging.error(f"Error running Ollama: {e}")
         logging.error(f"Ollama stderr: {e.stderr}")
-        return ""
+        return f"Error: {e.stderr}"
 
 
 def cleanup_files():
@@ -180,20 +204,19 @@ def main():
 
     recording = True
 
-    def stop_recording():
+    def stop_recording(signum, frame):
         nonlocal recording
         recording = False
+        print("\nStopping recording...")
+
+    signal.signal(signal.SIGINT, stop_recording)
 
     with stream:
         print("Listening... Press Ctrl+C to stop.")
-        try:
-            while recording:
-                time.sleep(0.1)
-        except KeyboardInterrupt:
-            stop_recording()
-        finally:
-            stream.stop()
-            print("Stopped listening.")
+        while recording:
+            time.sleep(0.1)
+        stream.stop()
+        print("Stopped listening.")
 
     if os.path.exists(CONFIG["live_translation_file"]) and os.path.getsize(CONFIG["live_translation_file"]) > 0:
         print("Transcriptions found.")
