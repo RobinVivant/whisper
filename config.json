@@ -1,0 +1,8 @@
+{
+    "model_name": "aiola/whisper-medusa-v1",
+    "sample_rate": 16000,
+    "chunk_duration": 5,
+    "ollama_model": "mistral-nemo:latest",
+    "live_translation_file": "live_translation.txt",
+    "summary_output_file": "meeting_summary.txt"
+}

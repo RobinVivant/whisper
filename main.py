@@ -7,13 +7,9 @@ import sounddevice as sd
 import torch
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
 
-# Configuration
-CONFIG = {
-    "model_name": "aiola/whisper-medusa-v1",
-    "sample_rate": 16000,
-    "chunk_duration": 5,  # Process 5 seconds of audio at a time
-    "ollama_model": "mistral-nemo:latest"
-}
+# Load configuration
+with open('config.json', 'r') as config_file:
+    CONFIG = json.load(config_file)
 
 # Load model and processor
 model_name = CONFIG["model_name"]
@@ -25,8 +21,8 @@ device = "mps" if torch.backends.mps.is_available() else "cpu"
 model = model.to(device)
 
 # Audio settings
-sample_rate = 16000
-chunk_duration = 5  # Process 5 seconds of audio at a time
+sample_rate = CONFIG["sample_rate"]
+chunk_duration = CONFIG["chunk_duration"]
 
 
 # Function to process audio chunk
@@ -54,7 +50,7 @@ def audio_callback(indata, status):
         audio_chunk = torch.from_numpy(indata[:, 0]).float()
         transcription = process_audio(audio_chunk)
 
-        with open("live_translation.txt", "a") as f:
+        with open(CONFIG["live_translation_file"], "a") as f:
             f.write(transcription + "\n")
 
         print(f"Translated: {transcription}")
@@ -70,7 +66,7 @@ def summarize_with_ollama(file_path):
     prompt = f"Please summarize the following text concisely:\n\n{content}"
 
     ollama_command = [
-        "ollama", "run", "mistral-nemo:latest",
+        "ollama", "run", CONFIG["ollama_model"],
         json.dumps({"prompt": prompt, "stream": False})
     ]
 
@@ -99,16 +95,16 @@ with sd.InputStream(callback=audio_callback, channels=1, samplerate=sample_rate,
         print("Stopped listening. Generating summary...")
 
 # Generate summary after recording stops
-summary = summarize_with_ollama("live_translation.txt")
+summary = summarize_with_ollama(CONFIG["live_translation_file"])
 
 if summary:
     print("\nSummary of the meeting:")
     print(summary)
 
-    # Optionally, save the summary to a file
-    with open("meeting_summary.txt", "w") as f:
+    # Save the summary to a file
+    with open(CONFIG["summary_output_file"], "w") as f:
         f.write(summary)
-    print("Summary saved to 'meeting_summary.txt'")
+    print(f"Summary saved to '{CONFIG['summary_output_file']}'")
 else:
     print("Failed to generate summary.")
 
@@ -116,8 +112,8 @@ else:
 # Clean up the translation file
 def cleanup_files():
     try:
-        os.remove("live_translation.txt")
-        print("Cleaned up temporary translation file.")
+        os.remove(CONFIG["live_translation_file"])
+        print(f"Cleaned up temporary translation file: {CONFIG['live_translation_file']}")
     except FileNotFoundError:
         print("No temporary file to clean up.")
     except Exception as e:
