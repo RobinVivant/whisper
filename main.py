@@ -5,6 +5,7 @@ import time
 import logging
 from typing import Dict, Any
 
+import numpy as np
 import sounddevice as sd
 import torch
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
@@ -49,7 +50,7 @@ def process_audio(audio_chunk: torch.Tensor) -> str:
     transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
     return transcription
 
-def audio_callback(indata: numpy.ndarray, frames: int, time: CData, status: CallbackFlags) -> None:
+def audio_callback(indata: np.ndarray, frames: int, time, status: sd.CallbackFlags) -> None:
     if status:
         logging.error(f"Error in audio stream: {status}")
         return
