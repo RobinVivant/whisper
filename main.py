@@ -14,7 +14,14 @@ from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Constants
-DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
+if torch.backends.mps.is_available():
+    DEVICE = torch.device("mps")
+elif torch.cuda.is_available():
+    DEVICE = torch.device("cuda")
+else:
+    DEVICE = torch.device("cpu")
+
+logging.info(f"Using device: {DEVICE}")
 
 
 def load_config() -> Dict[str, Any]:
@@ -29,6 +36,11 @@ def load_model_and_processor(model_name_param: str):
     logging.info(f"Loading model and processor from {model_name_param}")
     loaded_processor = AutoProcessor.from_pretrained(model_name_param)
     loaded_model = AutoModelForSpeechSeq2Seq.from_pretrained(model_name_param)
+    
+    if DEVICE.type == "mps":
+        # Convert the model to float32 for MPS compatibility
+        loaded_model = loaded_model.float()
+    
     loaded_model = loaded_model.to(DEVICE)
     logging.info(f"Model loaded and moved to device: {DEVICE}")
     return loaded_processor, loaded_model
@@ -48,6 +60,9 @@ def process_audio(audio_chunk: torch.Tensor) -> str:
 
     # Normalize the audio chunk
     audio_chunk = audio_chunk / torch.max(torch.abs(audio_chunk))
+
+    # Move audio_chunk to the correct device
+    audio_chunk = audio_chunk.to(DEVICE)
 
     input_features = processor(audio_chunk, sampling_rate=sample_rate, return_tensors="pt").input_features
     input_features = input_features.to(DEVICE)
@@ -70,7 +85,7 @@ def audio_callback(indata: np.ndarray, frames: int, time, status: sd.CallbackFla
 
     try:
         logging.debug(f"Received audio chunk of shape: {indata.shape}")
-        audio_chunk = torch.from_numpy(indata[:, 0]).float().to(DEVICE)
+        audio_chunk = torch.from_numpy(indata[:, 0]).float()
         transcription = process_audio(audio_chunk)
 
         if transcription:
