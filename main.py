@@ -49,10 +49,10 @@ def process_audio(audio_chunk: torch.Tensor) -> str:
     input_features = input_features.to(DEVICE)
 
     with torch.no_grad():
-        generated_ids = model.generate(input_features)
+        generated_ids = model.generate(input_features, max_length=448)
 
     transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
-    return transcription
+    return transcription.strip()
 
 
 def audio_callback(indata: np.ndarray, frames: int, time, status: sd.CallbackFlags) -> None:
@@ -111,12 +111,21 @@ def main():
     stream = sd.InputStream(callback=audio_callback, channels=1, samplerate=sample_rate,
                             blocksize=int(sample_rate * chunk_duration), dtype='float32')
 
+    recording = True
+
+    def stop_recording():
+        nonlocal recording
+        recording = False
+
     with stream:
         logging.info("Listening... Press Ctrl+C to stop.")
         try:
-            while True:
+            while recording:
                 time.sleep(0.1)
         except KeyboardInterrupt:
+            stop_recording()
+        finally:
+            stream.stop()
             logging.info("Stopped listening. Generating summary...")
 
     # Generate summary after recording stops
