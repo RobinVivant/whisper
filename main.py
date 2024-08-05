@@ -6,8 +6,16 @@ import sounddevice as sd
 import torch
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
 
+# Configuration
+CONFIG = {
+    "model_name": "aiola/whisper-medusa-v1",
+    "sample_rate": 16000,
+    "chunk_duration": 5,  # Process 5 seconds of audio at a time
+    "ollama_model": "mistral-nemo:latest"
+}
+
 # Load model and processor
-model_name = "aiola/whisper-medusa-v1"
+model_name = CONFIG["model_name"]
 processor = WhisperProcessor.from_pretrained(model_name)
 model = WhisperForConditionalGeneration.from_pretrained(model_name)
 
@@ -22,6 +30,9 @@ chunk_duration = 5  # Process 5 seconds of audio at a time
 
 # Function to process audio chunk
 def process_audio(audio_chunk):
+    # Normalize the audio chunk
+    audio_chunk = audio_chunk / torch.max(torch.abs(audio_chunk))
+    
     input_features = processor(audio_chunk, sampling_rate=sample_rate, return_tensors="pt").input_features
     input_features = input_features.to(device)
 
@@ -35,15 +46,19 @@ def process_audio(audio_chunk):
 # Callback function for audio stream
 def audio_callback(indata, frames, time, status):
     if status:
-        print(status)
+        print(f"Error in audio stream: {status}")
+        return
 
-    audio_chunk = torch.from_numpy(indata[:, 0]).float()
-    transcription = process_audio(audio_chunk)
+    try:
+        audio_chunk = torch.from_numpy(indata[:, 0]).float()
+        transcription = process_audio(audio_chunk)
 
-    with open("live_translation.txt", "a") as f:
-        f.write(transcription + "\n")
+        with open("live_translation.txt", "a") as f:
+            f.write(transcription + "\n")
 
-    print(f"Translated: {transcription}")
+        print(f"Translated: {transcription}")
+    except Exception as e:
+        print(f"Error processing audio: {e}")
 
 
 # Function to summarize content using Ollama
@@ -60,9 +75,15 @@ def summarize_with_ollama(file_path):
 
     try:
         result = subprocess.run(ollama_command, capture_output=True, text=True, check=True)
-        return json.loads(result.stdout)['response']
+        try:
+            return json.loads(result.stdout)['response']
+        except json.JSONDecodeError as je:
+            print(f"Error parsing Ollama output: {je}")
+            print(f"Raw output: {result.stdout}")
+            return None
     except subprocess.CalledProcessError as e:
         print(f"Error running Ollama: {e}")
+        print(f"Ollama stderr: {e.stderr}")
         return None
 
 
@@ -89,3 +110,17 @@ if summary:
     print("Summary saved to 'meeting_summary.txt'")
 else:
     print("Failed to generate summary.")
+
+# Clean up the translation file
+import os
+
+def cleanup_files():
+    try:
+        os.remove("live_translation.txt")
+        print("Cleaned up temporary translation file.")
+    except FileNotFoundError:
+        print("No temporary file to clean up.")
+    except Exception as e:
+        print(f"Error cleaning up file: {e}")
+
+cleanup_files()
