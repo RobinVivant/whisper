@@ -55,7 +55,7 @@ def process_audio(audio_chunk: torch.Tensor) -> str:
     return transcription
 
 
-def audio_callback(indata: np.ndarray, frames: int, time, status: sd.CallbackFlags) -> None:
+def audio_callback(indata: np.ndarray, status: sd.CallbackFlags) -> None:
     if status:
         logging.error(f"Error in audio stream: {status}")
         return
@@ -109,7 +109,7 @@ def cleanup_files():
 
 def main():
     stream = sd.InputStream(callback=audio_callback, channels=1, samplerate=sample_rate,
-                            blocksize=int(sample_rate * chunk_duration))
+                            blocksize=int(sample_rate * chunk_duration), dtype='float32')
 
     with stream:
         logging.info("Listening... Press Ctrl+C to stop.")
