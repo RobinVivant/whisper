@@ -139,11 +139,12 @@ def list_audio_devices() -> List[Dict[str, Any]]:
     input_devices = [device for device in devices if device['max_input_channels'] > 0]
     return input_devices
 
+
 def select_audio_device(devices: List[Dict[str, Any]]) -> int:
     print("Available input devices:")
     for i, device in enumerate(devices):
         print(f"{i}: {device['name']}")
-    
+
     while True:
         try:
             selection = int(input("Select the number of the input device to use: "))
@@ -154,20 +155,21 @@ def select_audio_device(devices: List[Dict[str, Any]]) -> int:
         except ValueError:
             print("Invalid input. Please enter a number.")
 
+
 def main():
     logging.info(f"Initializing audio stream with sample rate: {sample_rate}, chunk duration: {chunk_duration}")
-    
+
     input_devices = list_audio_devices()
     device_index = select_audio_device(input_devices)
     selected_device = input_devices[device_index]
-    
+
     logging.info(f"Selected input device: {selected_device['name']}")
 
-    stream = sd.InputStream(callback=audio_callback, 
+    stream = sd.InputStream(callback=audio_callback,
                             device=device_index,
-                            channels=1, 
+                            channels=1,
                             samplerate=sample_rate,
-                            blocksize=int(sample_rate * chunk_duration), 
+                            blocksize=int(sample_rate * chunk_duration),
                             dtype='float32')
 
     recording = True
