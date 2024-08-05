@@ -90,11 +90,11 @@ def summarize_with_ollama(file_path: str) -> str:
         except json.JSONDecodeError as je:
             logging.error(f"Error parsing Ollama output: {je}")
             logging.error(f"Raw output: {result.stdout}")
-            return None
+            return ""
     except subprocess.CalledProcessError as e:
         logging.error(f"Error running Ollama: {e}")
         logging.error(f"Ollama stderr: {e.stderr}")
-        return None
+        return ""
 
 
 def cleanup_files():
