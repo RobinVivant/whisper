@@ -1,9 +1,7 @@
-import io
 import json
 import logging
 import os
 import subprocess
-import sys
 import time
 from typing import Dict, Any
 
@@ -47,21 +45,21 @@ chunk_duration = CONFIG["chunk_duration"]
 
 def process_audio(audio_chunk: torch.Tensor) -> str:
     logging.debug(f"Processing audio chunk of shape: {audio_chunk.shape}")
-    
+
     # Normalize the audio chunk
     audio_chunk = audio_chunk / torch.max(torch.abs(audio_chunk))
-    
+
     input_features = processor(audio_chunk, sampling_rate=sample_rate, return_tensors="pt").input_features
     input_features = input_features.to(DEVICE)
-    
+
     logging.debug(f"Input features shape: {input_features.shape}")
-    
+
     with torch.no_grad():
         generated_ids = model.generate(input_features, max_length=448)
-    
+
     transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
     logging.debug(f"Raw transcription: '{transcription}'")
-    
+
     return transcription.strip()
 
 
