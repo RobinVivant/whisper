@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import time
 
@@ -32,7 +33,7 @@ chunk_duration = 5  # Process 5 seconds of audio at a time
 def process_audio(audio_chunk):
     # Normalize the audio chunk
     audio_chunk = audio_chunk / torch.max(torch.abs(audio_chunk))
-    
+
     input_features = processor(audio_chunk, sampling_rate=sample_rate, return_tensors="pt").input_features
     input_features = input_features.to(device)
 
@@ -44,7 +45,7 @@ def process_audio(audio_chunk):
 
 
 # Callback function for audio stream
-def audio_callback(indata, frames, time, status):
+def audio_callback(indata, status):
     if status:
         print(f"Error in audio stream: {status}")
         return
@@ -111,9 +112,8 @@ if summary:
 else:
     print("Failed to generate summary.")
 
-# Clean up the translation file
-import os
 
+# Clean up the translation file
 def cleanup_files():
     try:
         os.remove("live_translation.txt")
@@ -122,5 +122,6 @@ def cleanup_files():
         print("No temporary file to clean up.")
     except Exception as e:
         print(f"Error cleaning up file: {e}")
+
 
 cleanup_files()
