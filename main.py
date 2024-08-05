@@ -36,11 +36,11 @@ def load_model_and_processor(model_name_param: str):
     logging.info(f"Loading model and processor from {model_name_param}")
     loaded_processor = AutoProcessor.from_pretrained(model_name_param)
     loaded_model = AutoModelForSpeechSeq2Seq.from_pretrained(model_name_param)
-    
+
     if DEVICE.type == "mps":
         # Convert the model to float32 for MPS compatibility
         loaded_model = loaded_model.float()
-    
+
     loaded_model = loaded_model.to(DEVICE)
     logging.info(f"Model loaded and moved to device: {DEVICE}")
     return loaded_processor, loaded_model
