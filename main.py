@@ -25,11 +25,11 @@ def load_config() -> Dict[str, Any]:
 CONFIG = load_config()
 
 
-def load_model_and_processor(model_name: str):
-    processor = WhisperProcessor.from_pretrained(model_name)
-    model = WhisperForConditionalGeneration.from_pretrained(model_name)
-    model = model.to(DEVICE)
-    return processor, model
+def load_model_and_processor(model_name_param: str):
+    loaded_processor = WhisperProcessor.from_pretrained(model_name_param)
+    loaded_model = WhisperForConditionalGeneration.from_pretrained(model_name_param)
+    loaded_model = loaded_model.to(DEVICE)
+    return loaded_processor, loaded_model
 
 
 # Load model and processor
