@@ -28,18 +28,11 @@ CONFIG = load_config()
 
 
 def load_model_and_processor(model_name_param: str):
-    # Temporarily redirect stderr to suppress the warning
-    original_stderr = sys.stderr
-    sys.stderr = io.StringIO()
-
-    try:
-        loaded_processor = AutoProcessor.from_pretrained(model_name_param)
-        loaded_model = AutoModelForSpeechSeq2Seq.from_pretrained(model_name_param)
-        loaded_model = loaded_model.to(DEVICE)
-    finally:
-        # Restore stderr
-        sys.stderr = original_stderr
-
+    logging.info(f"Loading model and processor from {model_name_param}")
+    loaded_processor = AutoProcessor.from_pretrained(model_name_param)
+    loaded_model = AutoModelForSpeechSeq2Seq.from_pretrained(model_name_param)
+    loaded_model = loaded_model.to(DEVICE)
+    logging.info(f"Model loaded and moved to device: {DEVICE}")
     return loaded_processor, loaded_model
 
 
@@ -53,16 +46,22 @@ chunk_duration = CONFIG["chunk_duration"]
 
 
 def process_audio(audio_chunk: torch.Tensor) -> str:
+    logging.debug(f"Processing audio chunk of shape: {audio_chunk.shape}")
+    
     # Normalize the audio chunk
     audio_chunk = audio_chunk / torch.max(torch.abs(audio_chunk))
-
+    
     input_features = processor(audio_chunk, sampling_rate=sample_rate, return_tensors="pt").input_features
     input_features = input_features.to(DEVICE)
-
+    
+    logging.debug(f"Input features shape: {input_features.shape}")
+    
     with torch.no_grad():
         generated_ids = model.generate(input_features, max_length=448)
-
+    
     transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    logging.debug(f"Raw transcription: '{transcription}'")
+    
     return transcription.strip()
 
 
@@ -72,15 +71,19 @@ def audio_callback(indata: np.ndarray, frames: int, time, status: sd.CallbackFla
         return
 
     try:
-        audio_chunk = torch.from_numpy(indata[:, 0]).float()
+        logging.debug(f"Received audio chunk of shape: {indata.shape}")
+        audio_chunk = torch.from_numpy(indata[:, 0]).float().to(DEVICE)
         transcription = process_audio(audio_chunk)
 
-        with open(CONFIG["live_translation_file"], "a") as f:
-            f.write(transcription + "\n")
-
-        logging.info(f"Translated: {transcription}")
+        if transcription:
+            with open(CONFIG["live_translation_file"], "a") as f:
+                f.write(transcription + "\n")
+            logging.info(f"Transcribed: {transcription}")
+        else:
+            logging.warning("No transcription generated for this audio chunk.")
     except Exception as e:
         logging.error(f"Error processing audio: {e}")
+        logging.exception("Detailed error information:")
 
 
 def summarize_with_ollama(file_path: str) -> str:
@@ -119,6 +122,7 @@ def cleanup_files():
 
 
 def main():
+    logging.info(f"Initializing audio stream with sample rate: {sample_rate}, chunk duration: {chunk_duration}")
     stream = sd.InputStream(callback=audio_callback, channels=1, samplerate=sample_rate,
                             blocksize=int(sample_rate * chunk_duration), dtype='float32')
 
@@ -138,6 +142,12 @@ def main():
         finally:
             stream.stop()
             logging.info("Stopped listening. Generating summary...")
+
+    logging.info("Checking if any transcriptions were generated...")
+    if os.path.exists(CONFIG["live_translation_file"]) and os.path.getsize(CONFIG["live_translation_file"]) > 0:
+        logging.info("Transcriptions found. Proceeding with summary generation.")
+    else:
+        logging.warning("No transcriptions were generated. The audio input might not have been captured correctly.")
 
     # Generate summary after recording stops
     summary = summarize_with_ollama(CONFIG["live_translation_file"])
