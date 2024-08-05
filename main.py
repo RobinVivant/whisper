@@ -4,6 +4,8 @@ import os
 import subprocess
 import time
 from typing import Dict, Any
+import sys
+import io
 
 import numpy as np
 import sounddevice as sd
@@ -26,9 +28,18 @@ CONFIG = load_config()
 
 
 def load_model_and_processor(model_name_param: str):
-    loaded_processor = WhisperProcessor.from_pretrained(model_name_param)
-    loaded_model = WhisperForConditionalGeneration.from_pretrained(model_name_param)
-    loaded_model = loaded_model.to(DEVICE)
+    # Temporarily redirect stderr to suppress the warning
+    original_stderr = sys.stderr
+    sys.stderr = io.StringIO()
+    
+    try:
+        loaded_processor = WhisperProcessor.from_pretrained(model_name_param)
+        loaded_model = WhisperForConditionalGeneration.from_pretrained(model_name_param)
+        loaded_model = loaded_model.to(DEVICE)
+    finally:
+        # Restore stderr
+        sys.stderr = original_stderr
+    
     return loaded_processor, loaded_model
 
 
