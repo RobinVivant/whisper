@@ -1,11 +1,11 @@
+import io
 import json
 import logging
 import os
 import subprocess
+import sys
 import time
 from typing import Dict, Any
-import sys
-import io
 
 import numpy as np
 import sounddevice as sd
@@ -18,17 +18,20 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Constants
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 
+
 def load_config() -> Dict[str, Any]:
     with open('config.json', 'r') as config_file:
         return json.load(config_file)
 
+
 CONFIG = load_config()
+
 
 def load_model_and_processor(model_name_param: str):
     # Temporarily redirect stderr to suppress the warning
     original_stderr = sys.stderr
     sys.stderr = io.StringIO()
-    
+
     try:
         loaded_processor = AutoProcessor.from_pretrained(model_name_param)
         loaded_model = AutoModelForSpeechSeq2Seq.from_pretrained(model_name_param)
@@ -36,8 +39,9 @@ def load_model_and_processor(model_name_param: str):
     finally:
         # Restore stderr
         sys.stderr = original_stderr
-    
+
     return loaded_processor, loaded_model
+
 
 # Load model and processor
 model_name = CONFIG["model_name"]
@@ -46,6 +50,7 @@ processor, model = load_model_and_processor(model_name)
 # Audio settings
 sample_rate = CONFIG["sample_rate"]
 chunk_duration = CONFIG["chunk_duration"]
+
 
 def process_audio(audio_chunk: torch.Tensor) -> str:
     # Normalize the audio chunk
@@ -59,6 +64,7 @@ def process_audio(audio_chunk: torch.Tensor) -> str:
 
     transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
     return transcription.strip()
+
 
 def audio_callback(indata: np.ndarray, frames: int, time, status: sd.CallbackFlags) -> None:
     if status:
@@ -75,6 +81,7 @@ def audio_callback(indata: np.ndarray, frames: int, time, status: sd.CallbackFla
         logging.info(f"Translated: {transcription}")
     except Exception as e:
         logging.error(f"Error processing audio: {e}")
+
 
 def summarize_with_ollama(file_path: str) -> str:
     with open(file_path, 'r') as file:
@@ -100,6 +107,7 @@ def summarize_with_ollama(file_path: str) -> str:
         logging.error(f"Ollama stderr: {e.stderr}")
         return ""
 
+
 def cleanup_files():
     try:
         os.remove(CONFIG["live_translation_file"])
@@ -108,6 +116,7 @@ def cleanup_files():
         logging.info("No temporary file to clean up.")
     except Exception as e:
         logging.error(f"Error cleaning up file: {e}")
+
 
 def main():
     stream = sd.InputStream(callback=audio_callback, channels=1, samplerate=sample_rate,
@@ -145,6 +154,7 @@ def main():
         logging.error("Failed to generate summary.")
 
     cleanup_files()
+
 
 if __name__ == "__main__":
     main()
